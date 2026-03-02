@@ -13,6 +13,8 @@ async function start() {
     validateConfig();
 
     logger.info('Starting Claude Code Slack bot', {
+      instanceName: config.instanceName,
+      envFile: config.envFilePath,
       debug: config.debug,
       useBedrock: config.claude.useBedrock,
       useVertex: config.claude.useVertex,
@@ -41,11 +43,13 @@ async function start() {
     await app.start();
     logger.info('⚡️ Claude Code Slack bot is running!');
     logger.info('Configuration:', {
+      instanceName: config.instanceName,
       usingBedrock: config.claude.useBedrock,
       usingVertex: config.claude.useVertex,
       usingAnthropicAPI: !config.claude.useBedrock && !config.claude.useVertex,
       debugMode: config.debug,
       baseDirectory: config.baseDirectory || 'not set',
+      mcpConfigPath: config.mcpConfigPath || 'default (./mcp-servers.json)',
       mcpServers: mcpConfig ? Object.keys(mcpConfig.mcpServers).length : 0,
       mcpServerNames: mcpConfig ? Object.keys(mcpConfig.mcpServers) : [],
     });

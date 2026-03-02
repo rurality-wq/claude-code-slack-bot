@@ -679,10 +679,10 @@ export class SlackHandler {
       if (config.baseDirectory) {
         welcomeMessage += `You can use:\n`;
         welcomeMessage += `• \`cwd project-name\` (relative to base directory: \`${config.baseDirectory}\`)\n`;
-        welcomeMessage += `• \`cwd /absolute/path/to/project\` (absolute path)\n\n`;
+        welcomeMessage += `• \`cwd /absolute/path\` (absolute path)\n\n`;
       } else {
         welcomeMessage += `Please set it using:\n`;
-        welcomeMessage += `• \`cwd /path/to/project\` or \`set directory /path/to/project\`\n\n`;
+        welcomeMessage += `• \`cwd /path/to/directory\` or \`set directory /path/to/directory\`\n\n`;
       }
       
       welcomeMessage += `This will be the default working directory for this channel. `;

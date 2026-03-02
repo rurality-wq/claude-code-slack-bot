@@ -65,6 +65,13 @@ The bot allows users to interact with Claude Code through Slack, providing real-
 - **Runtime Management**: Reload configuration without restarting the bot
 - **Popular Integrations**: Filesystem access, GitHub API, database connections, web search
 
+#### 7. Multi-Instance Support
+- **Per-Instance `.env` Files**: Launch multiple instances with `--env-file <path>` CLI option
+- **Instance Naming**: `INSTANCE_NAME` environment variable for identification in logs
+- **Per-Instance MCP Config**: `MCP_CONFIG_PATH` to specify a separate MCP server config per instance
+- **Collision-Free Temp Files**: Temporary file names are prefixed with instance name
+- **Independent Processes**: Each instance runs as a separate process with its own Slack app credentials (Socket Mode requires one connection per app)
+
 ## Environment Configuration
 
 ### Required Variables
@@ -82,6 +89,10 @@ ANTHROPIC_API_KEY=your-anthropic-api-key
 ```env
 # Working Directory Configuration
 BASE_DIRECTORY=/Users/username/Code/
+
+# Multi-Instance Configuration
+INSTANCE_NAME=team-a
+MCP_CONFIG_PATH=./mcp-servers-team-a.json
 
 # Third-party API Providers
 CLAUDE_CODE_USE_BEDROCK=1
@@ -156,7 +167,7 @@ Progress: 1/3 tasks completed (33%)
 User: mcp
 Bot: 🔧 MCP Servers Configured:
      • filesystem (stdio)
-     • github (stdio)  
+     • github (stdio)
      • postgres (stdio)
 
 # Reload MCP configuration
@@ -168,14 +179,33 @@ User: @ClaudeBot list all TODO comments in the project
 Bot: [Uses mcp__filesystem tools to search files]
 ```
 
+### Multi-Instance Deployment
+```bash
+# Create per-instance .env files with separate Slack app credentials
+cp .env.example .env.team-a
+cp .env.example .env.team-b
+# Edit each file with different SLACK_BOT_TOKEN, SLACK_APP_TOKEN, etc.
+
+# Optionally create per-instance MCP configs
+cp mcp-servers.example.json mcp-servers-team-a.json
+
+# Launch instances
+tsx src/index.ts --env-file .env.team-a &
+tsx src/index.ts --env-file .env.team-b &
+
+# Or via npm script
+npm run start:instance -- .env.team-a
+```
+
 ## Development
 
 ### Build and Run
 ```bash
 npm install
 npm run build
-npm run dev     # Development with hot reload
-npm run prod    # Production mode
+npm run dev              # Development with hot reload
+npm run prod             # Production mode
+npm run start:instance -- .env.team-a  # Run a named instance
 ```
 
 ### Project Structure
@@ -204,6 +234,7 @@ mcp-servers.example.json          # Example MCP configuration
 3. **Smart File Handling**: Text content embedded in prompts, images passed as file paths for Claude to read
 4. **Hierarchical Working Directories**: Channel defaults with thread overrides for flexibility
 5. **Real-Time Feedback**: Status reactions and live task updates for transparency
+6. **Multi-Instance via Separate Processes**: Each instance is an independent process with its own Slack app credentials, `.env` file, and optional MCP config. No shared state between instances.
 
 ### Error Handling
 - Graceful degradation when Slack API calls fail
@@ -226,5 +257,4 @@ Potential areas for expansion:
 - Advanced file format support (PDFs, Office docs)
 - Integration with version control systems
 - Custom slash commands
-- Team-specific bot configurations
 - Analytics and usage tracking

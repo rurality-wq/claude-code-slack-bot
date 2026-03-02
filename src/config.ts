@@ -1,6 +1,17 @@
 import dotenv from 'dotenv';
 
-dotenv.config();
+// Parse --env-file argument from CLI
+function getEnvFilePath(): string | undefined {
+  const args = process.argv;
+  const index = args.indexOf('--env-file');
+  if (index !== -1 && index + 1 < args.length) {
+    return args[index + 1];
+  }
+  return undefined;
+}
+
+const envFilePath = getEnvFilePath();
+dotenv.config(envFilePath ? { path: envFilePath } : undefined);
 
 export const config = {
   slack: {
@@ -17,6 +28,9 @@ export const config = {
   },
   baseDirectory: process.env.BASE_DIRECTORY || '',
   debug: process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development',
+  instanceName: process.env.INSTANCE_NAME || 'default',
+  mcpConfigPath: process.env.MCP_CONFIG_PATH || '',
+  envFilePath: envFilePath || '.env',
 };
 
 export function validateConfig() {

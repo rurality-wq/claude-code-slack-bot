@@ -9,8 +9,9 @@ export class Logger {
 
   private formatMessage(level: string, message: string, data?: any): string {
     const timestamp = new Date().toISOString();
-    const prefix = `[${timestamp}] [${level}] [${this.context}]`;
-    
+    const instancePrefix = config.instanceName !== 'default' ? ` [${config.instanceName}]` : '';
+    const prefix = `[${timestamp}] [${level}]${instancePrefix} [${this.context}]`;
+
     if (data) {
       return `${prefix} ${message}\n${JSON.stringify(data, null, 2)}`;
     }

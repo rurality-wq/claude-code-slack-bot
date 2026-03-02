@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -55,9 +54,11 @@ export class FileHandler {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const buffer = await response.buffer();
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
       const tempDir = os.tmpdir();
-      const tempPath = path.join(tempDir, `slack-file-${Date.now()}-${file.name}`);
+      const instancePrefix = config.instanceName !== 'default' ? `${config.instanceName}-` : '';
+      const tempPath = path.join(tempDir, `slack-file-${instancePrefix}${Date.now()}-${file.name}`);
       
       fs.writeFileSync(tempPath, buffer);
 

@@ -169,10 +169,10 @@ export class WorkingDirectoryManager {
     let message = `No working directory set for ${context}. Please set one using:`;
     if (config.baseDirectory) {
       message += `\n\`cwd project-name\` (relative to base directory)`;
-      message += `\n\`cwd /absolute/path/to/directory\` (absolute path)`;
+      message += `\n\`cwd /path/to/project\` (absolute path)`;
       message += `\n\nBase directory: \`${config.baseDirectory}\``;
     } else {
-      message += `\n\`cwd /path/to/directory\` or \`set directory /path/to/directory\``;
+      message += `\n\`cwd /path/to/project\` or \`set directory /path/to/project\``;
     }
     return message;
   }
@@ -196,7 +196,7 @@ export class WorkingDirectoryManager {
     if (hasBaseDir) {
       message += `**Options:**\n`;
       message += `• \`cwd project-name\` (relative to: \`${config.baseDirectory}\`)\n`;
-      message += `• \`cwd /absolute/path/to/project\` (absolute path)\n\n`;
+      message += `• \`cwd /path/to/project\` (absolute path)\n\n`;
     } else {
       message += `**Usage:**\n`;
       message += `• \`cwd /path/to/project\`\n`;

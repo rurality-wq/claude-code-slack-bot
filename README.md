@@ -10,10 +10,11 @@ A Slack bot that integrates with Claude Code SDK to provide AI-powered coding as
 - 📝 Markdown formatting - code blocks and formatting are preserved
 - 🔧 Session management - maintains conversation context across messages
 - ⚡ Real-time updates - messages update as Claude thinks
+- 🔀 Multi-instance support - run multiple bot instances with separate Slack apps and configs
 
 ## Prerequisites
 
-- Node.js 18+ installed
+- Node.js 22+ installed
 - A Slack workspace where you can install apps
 - Claude Code
 
@@ -225,6 +226,62 @@ All MCP tools are automatically allowed and follow the pattern: `mcp__serverName
 
 ## Advanced Configuration
 
+### Multi-Instance Deployment
+
+You can run multiple bot instances within the same Slack workspace by creating separate Slack apps and `.env` files for each instance. Each instance runs as an independent process.
+
+#### 1. Create Separate Slack Apps
+
+Create a new Slack app for each instance at [api.slack.com/apps](https://api.slack.com/apps). Each app needs its own bot token, app token, and signing secret. Assign each app to different channels.
+
+#### 2. Create Per-Instance `.env` Files
+
+```bash
+cp .env.example .env.team-a
+cp .env.example .env.team-b
+```
+
+Edit each file with separate Slack credentials and settings:
+
+```env
+# .env.team-a
+SLACK_BOT_TOKEN=xoxb-team-a-token
+SLACK_APP_TOKEN=xapp-team-a-token
+SLACK_SIGNING_SECRET=team-a-secret
+
+INSTANCE_NAME=team-a
+BASE_DIRECTORY=/home/user/projects/team-a/
+MCP_CONFIG_PATH=./mcp-servers-team-a.json
+```
+
+#### 3. (Optional) Per-Instance MCP Configs
+
+```bash
+cp mcp-servers.example.json mcp-servers-team-a.json
+# Edit with team-specific tool configurations
+```
+
+#### 4. Launch Instances
+
+```bash
+# Using --env-file flag
+tsx src/index.ts --env-file .env.team-a &
+tsx src/index.ts --env-file .env.team-b &
+
+# Or using npm script
+npm run start:instance -- .env.team-a
+npm run start:instance -- .env.team-b
+```
+
+Without `--env-file`, the bot reads the default `.env` file (existing behavior).
+
+#### Environment Variables for Multi-Instance
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `INSTANCE_NAME` | Identifier shown in logs and used for temp file prefixes | `default` |
+| `MCP_CONFIG_PATH` | Path to instance-specific MCP server config | `./mcp-servers.json` |
+
 ### Using AWS Bedrock
 Set these environment variables:
 ```env
@@ -257,20 +314,25 @@ This will show detailed logs including:
 ### Project Structure
 ```
 src/
-├── index.ts          # Application entry point
-├── config.ts         # Configuration management
+├── index.ts                      # Application entry point
+├── config.ts                     # Configuration (env, CLI args)
 ├── types.ts                      # TypeScript type definitions
 ├── claude-handler.ts             # Claude Code SDK integration
 ├── slack-handler.ts              # Slack event handling
 ├── working-directory-manager.ts  # Working directory management
-└── logger.ts                     # Logging utility
+├── file-handler.ts               # File upload processing
+├── todo-manager.ts               # Task list tracking
+├── mcp-manager.ts                # MCP server management
+├── permission-mcp-server.ts      # Permission prompt MCP server
+└── logger.ts                     # Logging utility (instance-aware)
 ```
 
 ### Available Scripts
 - `npm run dev` - Start in development mode with hot reload
 - `npm run build` - Build TypeScript to JavaScript
-- `npm start` - Run the compiled JavaScript
+- `npm start` - Run with tsx
 - `npm run prod` - Run production build
+- `npm run start:instance -- .env.team-a` - Run a named instance with a specific env file
 
 ## Troubleshooting
 
