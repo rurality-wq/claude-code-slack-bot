@@ -56,7 +56,8 @@ export class ClaudeHandler {
     abortController?: AbortController,
     workingDirectory?: string,
     slackContext?: { channel: string; threadTs?: string; user: string },
-    model?: string
+    model?: string,
+    continueSession?: boolean
   ): AsyncGenerator<SDKMessage, void, unknown> {
     const options: any = {
       outputFormat: 'stream-json',
@@ -122,7 +123,11 @@ export class ClaudeHandler {
       });
     }
 
-    if (session?.sessionId) {
+    if (continueSession) {
+      // claude -c: continue most recent session from disk (ignores in-memory session ID)
+      options.continue = true;
+      this.logger.debug('Continuing most recent Claude session from disk');
+    } else if (session?.sessionId) {
       options.resume = session.sessionId;
       this.logger.debug('Resuming session', { sessionId: session.sessionId });
     } else {

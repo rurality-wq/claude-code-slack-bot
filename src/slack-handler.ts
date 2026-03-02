@@ -37,6 +37,7 @@ export class SlackHandler {
   private mcpManager: McpManager;
   private todoMessages: Map<string, string> = new Map(); // sessionKey -> messageTs
   private userModelPreferences: Map<string, string> = new Map(); // userId -> model
+  private continueNextQuery: Set<string> = new Set(); // sessionKey of conversations using --continue
   private originalMessages: Map<string, { channel: string; ts: string }> = new Map(); // sessionKey -> original message info
   private currentReactions: Map<string, string> = new Map(); // sessionKey -> current emoji
   private botUserId: string | null = null;
@@ -258,7 +259,12 @@ export class SlackHandler {
       };
       
       const preferredModel = this.userModelPreferences.get(user);
-      for await (const message of this.claudeHandler.streamQuery(finalPrompt, session, abortController, workingDirectory, slackContext, preferredModel)) {
+      // Consume /continue flag — keyed by user-channel[-threadTs] to match across messages
+      const continueMarkerKey = thread_ts
+        ? `${user}-${channel}-${thread_ts}`
+        : `${user}-${channel}`;
+      const continueSession = this.continueNextQuery.delete(continueMarkerKey);
+      for await (const message of this.claudeHandler.streamQuery(finalPrompt, session, abortController, workingDirectory, slackContext, preferredModel, continueSession)) {
         if (abortController.signal.aborted) break;
 
         this.logger.debug('Received message from Claude SDK', {
@@ -700,6 +706,18 @@ export class SlackHandler {
           `• *Session ID:* \`${session.sessionId || 'N/A'}\``;
       }
 
+      case 'continue':
+      case 'c': {
+        // Key: user-channel[-threadTs]. threadTs is stable; without it use user-channel only.
+        const markerKey = threadTs
+          ? `${userId}-${channelId}-${threadTs}`
+          : `${userId}-${channelId}`;
+        this.continueNextQuery.add(markerKey);
+        return `🔄 *Continue mode enabled*\n` +
+          `Your next message will resume the most recent Claude Code session from disk (\`claude -c\`).\n` +
+          `This is useful after a bot restart or to continue a session started in the CLI.`;
+      }
+
       case 'model': {
         const ALIASES: Record<string, string> = {
           'opus':   'claude-opus-4-6',
@@ -749,6 +767,7 @@ export class SlackHandler {
           `*Info:*\n` +
           `• \`/cost\` or \`/usage\` — Show session usage and cost\n` +
           `• \`/model\` — Show or set the Claude model\n` +
+          `• \`/continue\` or \`/c\` — Resume most recent Claude session (like \`claude -c\`)\n` +
           `• \`/help\` — Show this help message\n\n` +
           `*Usage:*\n` +
           `Just send a message to start chatting with Claude Code. ` +
