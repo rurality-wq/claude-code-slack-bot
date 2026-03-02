@@ -21,6 +21,23 @@ export class ClaudeHandler {
     return this.sessions.get(this.getSessionKey(userId, channelId, threadTs));
   }
 
+  /**
+   * Find the most recent session for a user+channel combination.
+   * Useful for slash commands like /cost sent as new messages (not in a thread).
+   */
+  findRecentSession(userId: string, channelId: string): ConversationSession | undefined {
+    const prefix = `${userId}-${channelId}-`;
+    let latest: ConversationSession | undefined;
+    for (const [key, session] of this.sessions.entries()) {
+      if (key.startsWith(prefix)) {
+        if (!latest || session.lastActivity > latest.lastActivity) {
+          latest = session;
+        }
+      }
+    }
+    return latest;
+  }
+
   createSession(userId: string, channelId: string, threadTs?: string): ConversationSession {
     const session: ConversationSession = {
       userId,
@@ -120,7 +137,8 @@ export class ClaudeHandler {
         if (message.type === 'system' && message.subtype === 'init') {
           if (session) {
             session.sessionId = message.session_id;
-            this.logger.info('Session initialized', { 
+            session.model = (message as any).model;
+            this.logger.info('Session initialized', {
               sessionId: message.session_id,
               model: (message as any).model,
               tools: (message as any).tools?.length || 0,

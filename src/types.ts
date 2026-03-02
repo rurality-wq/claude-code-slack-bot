@@ -6,6 +6,11 @@ export interface ConversationSession {
   isActive: boolean;
   lastActivity: Date;
   workingDirectory?: string;
+  // Accumulated usage stats
+  totalCostUsd?: number;
+  totalDurationMs?: number;
+  totalTurns?: number;
+  model?: string;
 }
 
 export interface WorkingDirectoryConfig {

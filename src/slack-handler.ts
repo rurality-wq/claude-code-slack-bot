@@ -121,6 +121,18 @@ export class SlackHandler {
       return;
     }
 
+    // Check if this is a slash command (only if there's text)
+    if (text && this.isSlashCommand(text)) {
+      const response = this.handleSlashCommand(text, user, channel, thread_ts);
+      if (response) {
+        await say({
+          text: response,
+          thread_ts: thread_ts || ts,
+        });
+        return;
+      }
+    }
+
     // Check if this is an MCP info command (only if there's text)
     if (text && this.isMcpInfoCommand(text)) {
       await say({
@@ -302,15 +314,23 @@ export class SlackHandler {
             }
           }
         } else if (message.type === 'result') {
+          const resultMsg = message as any;
           this.logger.info('Received result from Claude SDK', {
             subtype: message.subtype,
-            hasResult: message.subtype === 'success' && !!(message as any).result,
-            totalCost: (message as any).total_cost_usd,
-            duration: (message as any).duration_ms,
+            hasResult: message.subtype === 'success' && !!resultMsg.result,
+            totalCost: resultMsg.total_cost_usd,
+            duration: resultMsg.duration_ms,
           });
-          
-          if (message.subtype === 'success' && (message as any).result) {
-            const finalResult = (message as any).result;
+
+          // Track usage stats on session
+          if (session) {
+            session.totalCostUsd = (session.totalCostUsd || 0) + (resultMsg.total_cost_usd || 0);
+            session.totalDurationMs = (session.totalDurationMs || 0) + (resultMsg.duration_ms || 0);
+            session.totalTurns = (session.totalTurns || 0) + (resultMsg.num_turns || 0);
+          }
+
+          if (message.subtype === 'success' && resultMsg.result) {
+            const finalResult = resultMsg.result;
             if (finalResult && !currentMessages.includes(finalResult)) {
               const formatted = this.formatMessage(finalResult, true);
               await say({
@@ -641,6 +661,62 @@ export class SlackHandler {
     }
 
     await this.updateMessageReaction(sessionKey, emoji);
+  }
+
+  private isSlashCommand(text: string): boolean {
+    return /^\/\w+/.test(text.trim());
+  }
+
+  private handleSlashCommand(text: string, userId: string, channelId: string, threadTs?: string): string | null {
+    const trimmed = text.trim();
+    const match = trimmed.match(/^\/(\w+)(?:\s+(.*))?$/);
+    if (!match) return null;
+
+    const command = match[1].toLowerCase();
+    const args = match[2]?.trim();
+
+    switch (command) {
+      case 'cost':
+      case 'usage': {
+        // Try exact session match first, then fall back to most recent session for this user+channel
+        const session = (threadTs && this.claudeHandler.getSession(userId, channelId, threadTs))
+          || this.claudeHandler.findRecentSession(userId, channelId);
+        if (!session || !session.totalCostUsd) {
+          return '📊 *Usage*\nNo usage data yet for this session. Start a conversation first!';
+        }
+        const cost = session.totalCostUsd.toFixed(6);
+        const duration = session.totalDurationMs
+          ? `${(session.totalDurationMs / 1000).toFixed(1)}s`
+          : 'N/A';
+        const turns = session.totalTurns || 0;
+        const model = session.model || 'unknown';
+        return `📊 *Session Usage*\n` +
+          `• *Model:* \`${model}\`\n` +
+          `• *Total cost:* $${cost}\n` +
+          `• *Total duration:* ${duration}\n` +
+          `• *API turns:* ${turns}\n` +
+          `• *Session ID:* \`${session.sessionId || 'N/A'}\``;
+      }
+
+      case 'help':
+        return `💡 *Available Commands*\n\n` +
+          `*Working Directory:*\n` +
+          `• \`cwd <path>\` — Set working directory\n` +
+          `• \`cwd\` or \`get directory\` — Show current directory\n\n` +
+          `*MCP Servers:*\n` +
+          `• \`mcp\` or \`servers\` — Show configured MCP servers\n` +
+          `• \`mcp reload\` — Reload MCP configuration\n\n` +
+          `*Info:*\n` +
+          `• \`/cost\` or \`/usage\` — Show session usage and cost\n` +
+          `• \`/help\` — Show this help message\n\n` +
+          `*Usage:*\n` +
+          `Just send a message to start chatting with Claude Code. ` +
+          `Upload files by dragging and dropping them into the conversation.`;
+
+      default:
+        // Unknown slash command — pass through to Claude as a regular prompt
+        return null;
+    }
   }
 
   private isMcpInfoCommand(text: string): boolean {
