@@ -55,13 +55,18 @@ export class ClaudeHandler {
     session?: ConversationSession,
     abortController?: AbortController,
     workingDirectory?: string,
-    slackContext?: { channel: string; threadTs?: string; user: string }
+    slackContext?: { channel: string; threadTs?: string; user: string },
+    model?: string
   ): AsyncGenerator<SDKMessage, void, unknown> {
     const options: any = {
       outputFormat: 'stream-json',
       executable: process.execPath,
       permissionMode: slackContext ? 'default' : 'bypassPermissions',
     };
+
+    if (model) {
+      options.model = model;
+    }
 
     // Add permission prompt tool if we have Slack context
     if (slackContext) {

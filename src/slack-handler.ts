@@ -36,6 +36,7 @@ export class SlackHandler {
   private todoManager: TodoManager;
   private mcpManager: McpManager;
   private todoMessages: Map<string, string> = new Map(); // sessionKey -> messageTs
+  private userModelPreferences: Map<string, string> = new Map(); // userId -> model
   private originalMessages: Map<string, { channel: string; ts: string }> = new Map(); // sessionKey -> original message info
   private currentReactions: Map<string, string> = new Map(); // sessionKey -> current emoji
   private botUserId: string | null = null;
@@ -256,7 +257,8 @@ export class SlackHandler {
         user
       };
       
-      for await (const message of this.claudeHandler.streamQuery(finalPrompt, session, abortController, workingDirectory, slackContext)) {
+      const preferredModel = this.userModelPreferences.get(user);
+      for await (const message of this.claudeHandler.streamQuery(finalPrompt, session, abortController, workingDirectory, slackContext, preferredModel)) {
         if (abortController.signal.aborted) break;
 
         this.logger.debug('Received message from Claude SDK', {
@@ -698,6 +700,44 @@ export class SlackHandler {
           `• *Session ID:* \`${session.sessionId || 'N/A'}\``;
       }
 
+      case 'model': {
+        const ALIASES: Record<string, string> = {
+          'opus':   'claude-opus-4-6',
+          'sonnet': 'claude-sonnet-4-6',
+          'haiku':  'claude-haiku-4-5-20251001',
+        };
+
+        if (!args) {
+          // Show current model
+          const session = (threadTs && this.claudeHandler.getSession(userId, channelId, threadTs))
+            || this.claudeHandler.findRecentSession(userId, channelId);
+          const sessionModel = session?.model;
+          const preferredModel = this.userModelPreferences.get(userId);
+          const effectiveModel = preferredModel || sessionModel || '(default — set by Claude Code)';
+          let msg = `🤖 *Current Model*\n• *Active:* \`${effectiveModel}\``;
+          if (preferredModel) {
+            msg += `\n• _(User preference set)_`;
+          } else if (sessionModel) {
+            msg += `\n• _(From last session)_`;
+          }
+          msg += `\n\n*Available models:*\n` +
+            `• \`opus\` → \`claude-opus-4-6\`\n` +
+            `• \`sonnet\` → \`claude-sonnet-4-6\`\n` +
+            `• \`haiku\` → \`claude-haiku-4-5-20251001\`\n\n` +
+            `Use \`/model <name>\` to change. Use \`/model reset\` to use the default.`;
+          return msg;
+        }
+
+        if (args === 'reset' || args === 'default' || args === 'clear') {
+          this.userModelPreferences.delete(userId);
+          return `🤖 *Model reset to default* (Claude Code will choose the model)`;
+        }
+
+        const resolved = ALIASES[args.toLowerCase()] || args;
+        this.userModelPreferences.set(userId, resolved);
+        return `🤖 *Model set to \`${resolved}\`*\nThis will be used for your next conversation.`;
+      }
+
       case 'help':
         return `💡 *Available Commands*\n\n` +
           `*Working Directory:*\n` +
@@ -708,6 +748,7 @@ export class SlackHandler {
           `• \`mcp reload\` — Reload MCP configuration\n\n` +
           `*Info:*\n` +
           `• \`/cost\` or \`/usage\` — Show session usage and cost\n` +
+          `• \`/model\` — Show or set the Claude model\n` +
           `• \`/help\` — Show this help message\n\n` +
           `*Usage:*\n` +
           `Just send a message to start chatting with Claude Code. ` +
