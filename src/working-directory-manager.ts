@@ -141,15 +141,20 @@ export class WorkingDirectoryManager {
   parseSetCommand(text: string): string | null {
     const cwdMatch = text.match(/^cwd\s+(.+)$/i);
     if (cwdMatch) {
-      return cwdMatch[1].trim();
+      return this.cleanPath(cwdMatch[1]);
     }
 
     const setMatch = text.match(/^set\s+(?:cwd|dir|directory|working[- ]?directory)\s+(.+)$/i);
     if (setMatch) {
-      return setMatch[1].trim();
+      return this.cleanPath(setMatch[1]);
     }
 
     return null;
+  }
+
+  private cleanPath(input: string): string {
+    // Strip Slack code formatting backticks and trim whitespace
+    return input.replace(/`/g, '').trim();
   }
 
   isGetCommand(text: string): boolean {

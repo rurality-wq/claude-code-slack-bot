@@ -16,7 +16,7 @@ A Slack bot that integrates with Claude Code SDK to provide AI-powered coding as
 
 - Node.js 22+ installed
 - A Slack workspace where you can install apps
-- Claude Code
+- Claude Code CLI installed and authenticated (`claude login`), or an Anthropic API key
 
 ## Setup
 
@@ -73,12 +73,19 @@ SLACK_APP_TOKEN=xapp-your-app-token
 SLACK_SIGNING_SECRET=your-signing-secret
 
 # Claude Code Configuration
-# This is only needed if you don't use a Claude subscription
+# Option 1: Use Claude.ai subscription (OAuth) - no API key needed
+#   Run "claude login" in your terminal first.
+#   Leave ANTHROPIC_API_KEY commented out.
 
+# Option 2: Use Anthropic API key
 # ANTHROPIC_API_KEY=your-anthropic-api-key
+
+# Option 3: Use third-party providers
 # CLAUDE_CODE_USE_BEDROCK=1
 # CLAUDE_CODE_USE_VERTEX=1
 ```
+
+> **Important**: Do NOT set `ANTHROPIC_API_KEY=` (empty string). Either provide a valid key or leave the line commented out. An empty value causes authentication failure instead of OAuth fallback.
 
 ### 5. Run the Bot
 
@@ -265,8 +272,8 @@ cp mcp-servers.example.json mcp-servers-team-a.json
 
 ```bash
 # Using --env-file flag
-tsx src/index.ts --env-file .env.team-a &
-tsx src/index.ts --env-file .env.team-b &
+npx tsx src/index.ts --env-file .env.team-a &
+npx tsx src/index.ts --env-file .env.team-b &
 
 # Or using npm script
 npm run start:instance -- .env.team-a
@@ -274,6 +281,8 @@ npm run start:instance -- .env.team-b
 ```
 
 Without `--env-file`, the bot reads the default `.env` file (existing behavior).
+
+> **Windows note**: When stopping instances, use `taskkill /F /PID <pid> /T` to kill the entire process tree. Simply closing the terminal may leave orphaned child processes that block Socket Mode reconnections.
 
 #### Environment Variables for Multi-Instance
 
@@ -343,9 +352,22 @@ src/
 4. Check Slack app permissions are configured correctly
 
 ### Authentication errors
-1. Verify your Anthropic API key is valid
-2. Check Slack tokens haven't expired
-3. Ensure Socket Mode is enabled
+1. **Using OAuth**: Run `claude login` in your terminal and ensure `~/.claude/.credentials.json` exists
+2. **Using API key**: Verify your `ANTHROPIC_API_KEY` is valid (do NOT leave it as an empty string)
+3. Check Slack tokens haven't expired
+4. Ensure Socket Mode is enabled
+
+### Claude Code process exited with code 1
+Common causes:
+- **SDK version too old**: Run `npm install @anthropic-ai/claude-code@^1.0.128` (must be 1.x, not 2.x)
+- **Empty API key**: `ANTHROPIC_API_KEY=` (empty) causes auth failure. Comment it out for OAuth.
+- **Nested session**: If launched from within Claude Code, the bot clears `CLAUDECODE` env var automatically. If you still see this, restart from a clean shell.
+
+### Socket Mode "pong wasn't received" / "too_many_websockets"
+This happens when stale bot processes hold old WebSocket connections. Slack limits concurrent connections per app token.
+- **Windows**: Use `taskkill /F /PID <pid> /T` to kill the entire process tree, or use Task Manager to end all related `node.exe` processes.
+- **Linux/macOS**: Use `kill` or `pkill -f "env-file"` to stop all instances.
+- After killing stale processes, wait ~15 seconds before restarting.
 
 ### Message formatting issues
 The bot converts Claude's markdown to Slack's formatting. Some complex formatting may not translate perfectly.

@@ -5,7 +5,22 @@ import { SlackHandler } from './slack-handler';
 import { McpManager } from './mcp-manager';
 import { Logger } from './logger';
 
+// Clear Claude Code session markers so the SDK can spawn subprocess instances.
+// Without this, launching the bot from within a Claude Code session (e.g. during
+// development) would cause the SDK child process to refuse to start.
+delete process.env.CLAUDECODE;
+delete process.env.CLAUDE_CODE_ENTRYPOINT;
+
 const logger = new Logger('Main');
+
+// Catch unhandled errors to prevent silent crashes
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception', error);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled rejection', reason instanceof Error ? reason : { reason });
+});
 
 async function start() {
   try {

@@ -42,6 +42,7 @@ export class ClaudeHandler {
   ): AsyncGenerator<SDKMessage, void, unknown> {
     const options: any = {
       outputFormat: 'stream-json',
+      executable: process.execPath,
       permissionMode: slackContext ? 'default' : 'bypassPermissions',
     };
 
@@ -65,6 +66,7 @@ export class ClaudeHandler {
           command: 'npx',
           args: ['tsx', path.resolve(__dirname, '..', 'src', 'permission-mcp-server.ts')],
           env: {
+            ...process.env,
             SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN,
             SLACK_CONTEXT: JSON.stringify(slackContext)
           }
@@ -110,8 +112,10 @@ export class ClaudeHandler {
     try {
       for await (const message of query({
         prompt,
-        abortController: abortController || new AbortController(),
-        options,
+        options: {
+          ...options,
+          abortController: abortController || new AbortController(),
+        },
       })) {
         if (message.type === 'system' && message.subtype === 'init') {
           if (session) {

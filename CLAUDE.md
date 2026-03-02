@@ -78,15 +78,25 @@ The bot allows users to interact with Claude Code through Slack, providing real-
 ```env
 # Slack App Configuration
 SLACK_BOT_TOKEN=xoxb-your-bot-token
-SLACK_APP_TOKEN=xapp-your-app-token  
+SLACK_APP_TOKEN=xapp-your-app-token
 SLACK_SIGNING_SECRET=your-signing-secret
-
-# Claude Code Configuration
-ANTHROPIC_API_KEY=your-anthropic-api-key
 ```
+
+### Authentication
+The bot supports two authentication methods:
+
+1. **Claude.ai Subscription (OAuth)** - Recommended for development. Run `claude login` in your terminal first. No `ANTHROPIC_API_KEY` needed.
+2. **Anthropic API Key** - Set `ANTHROPIC_API_KEY` in your `.env` file for server/production deployments.
+
+If `ANTHROPIC_API_KEY` is not set (or commented out), the bot uses the locally stored OAuth credentials from `~/.claude/.credentials.json`.
+
+> **Important**: Do NOT set `ANTHROPIC_API_KEY=` (empty string). This causes the CLI to attempt API key auth with an empty key instead of falling back to OAuth. Either set a valid key or comment out / remove the line entirely.
 
 ### Optional Variables
 ```env
+# Claude Code Configuration (omit to use OAuth)
+# ANTHROPIC_API_KEY=your-anthropic-api-key
+
 # Working Directory Configuration
 BASE_DIRECTORY=/Users/username/Code/
 
@@ -190,12 +200,14 @@ cp .env.example .env.team-b
 cp mcp-servers.example.json mcp-servers-team-a.json
 
 # Launch instances
-tsx src/index.ts --env-file .env.team-a &
-tsx src/index.ts --env-file .env.team-b &
+npx tsx src/index.ts --env-file .env.team-a &
+npx tsx src/index.ts --env-file .env.team-b &
 
 # Or via npm script
 npm run start:instance -- .env.team-a
 ```
+
+> **Note (Windows)**: When stopping the bot on Windows, ensure all child processes are terminated. `Ctrl+C` or `taskkill` on the parent process may not kill the `npx` → `tsx` → `node` child process chain. Use Task Manager or `taskkill /F /PID <pid> /T` (with `/T` for process tree) to avoid orphaned processes that hold stale Socket Mode WebSocket connections.
 
 ## Development
 
@@ -235,13 +247,18 @@ mcp-servers.example.json          # Example MCP configuration
 4. **Hierarchical Working Directories**: Channel defaults with thread overrides for flexibility
 5. **Real-Time Feedback**: Status reactions and live task updates for transparency
 6. **Multi-Instance via Separate Processes**: Each instance is an independent process with its own Slack app credentials, `.env` file, and optional MCP config. No shared state between instances.
+7. **SDK Version Pinned to 1.x**: The `@anthropic-ai/claude-code` package v2.x removed the programmatic `query()` API and became CLI-only. The bot requires v1.x (`^1.0.128`) which exposes the `query` function and `SDKMessage` type.
+8. **Nested Session Protection**: On startup, the bot clears `CLAUDECODE` and `CLAUDE_CODE_ENTRYPOINT` environment variables. This allows the bot to be launched from within a Claude Code session (e.g., during development) without the SDK subprocess refusing to start due to nested session detection.
+9. **Cross-Platform Process Spawning**: Uses `executable: process.execPath` when calling the SDK to ensure the correct Node.js binary is used on all platforms. On Windows, `spawn("node", ...)` can fail with ENOENT, while `process.execPath` always resolves correctly.
 
 ### Error Handling
+- Global `uncaughtException` and `unhandledRejection` handlers prevent silent crashes
 - Graceful degradation when Slack API calls fail
 - Automatic retry for transient errors
 - Comprehensive logging for debugging
 - User-friendly error messages
 - Automatic cleanup of temporary files
+- Slack backtick formatting stripped from `cwd` commands (e.g., `` `project-name` `` → `project-name`)
 
 ### Security Considerations
 - Environment variables for sensitive configuration
